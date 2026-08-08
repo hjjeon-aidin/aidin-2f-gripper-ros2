@@ -1,0 +1,19 @@
+# CMake / C++
+build/
+cmake-build-*/
+
+# colcon / ROS2
+install/
+log/
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

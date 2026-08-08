@@ -1,0 +1,7 @@
+# Latched emergency release (rATR). Subsequent moves are ignored until
+# Activate is called again to clear the latch.
+
+bool close_direction false   # false = release open, true = release close
+---
+bool success
+string message
