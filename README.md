@@ -16,6 +16,60 @@ AIDIN 2지 BLDC 그리퍼용 호스트 소프트웨어 모음입니다. USB-RS48
 | [`python/`](python/) | Pure-Python SDK (`pyserial`) — same API surface as the C++ SDK | [README](python/README.md) |
 | [`ros2/`](ros2/) | ROS2 packages: `aidin_gripper_driver` (rclcpp node), `aidin_gripper_msgs`, `aidin_gripper_examples`. State topic @ 50 Hz + services (`activate`/`home`/`move_to`/`emergency_release`/…) | [README](ros2/README.md) |
 
+## Gripper operating procedure / 그리퍼 실행 절차
+
+`cpp/`, `python/`, `ros2/` all drive the same firmware state machine in the
+same order, regardless of which interface you pick.
+
+세 인터페이스(`cpp/`, `python/`, `ros2/`) 모두 동일한 순서로 동일한 펌웨어
+상태 머신을 구동합니다. 사용하는 인터페이스와 무관하게 아래 순서를
+따르세요.
+
+| # | Step / 단계 | Python | ROS2 | Protocol |
+|---|---|---|---|---|
+| 1 | Wire & power / 배선·전원 | USB↔RS485 adapter → gripper UART1, 115200 8N1 | 동일 | — |
+| 2 | Connect / 연결 | `g.connect("/dev/ttyUSB0")` | `port:=` launch arg | opens the serial link |
+| 3 | Activate / 활성화 | `g.activate()` | `ros2 service call .../activate std_srvs/srv/Trigger` | `rACT=1`, wait `gSTA=Active` |
+| 4 | Home / 호밍 | `g.home()` | `.../home` service (or `auto_home:=true`) | `rHOM` rising edge, wait `gHOM=1` — **keep hands clear, fingers seek a hard stop / 손을 가까이 두지 마세요** |
+| 5 | Move (open/close) / 이동 | `g.move_to(pos, speed, force, blocking=True)` | `.../move_to` (`MoveTo` service) | `rPR`/`rSP`/`rFR` + `rGTO` |
+| 6 | Monitor status / 상태 모니터링 | `g.read_state()` | subscribe `/aidin_gripper_driver/state` | `gSTA`/`gOBJ`/`gPO`/`gFLT` |
+| — | Recover from a fault/jam / 고장·끼임 복구 | `g.emergency_release(...)` then `g.activate()` again | `.../emergency_release` then `.../activate` | see each README's Troubleshooting table |
+
+Minimal Python run-through (full script with progress logging:
+[`python/examples/06_full_quickstart_demo.py`](python/examples/06_full_quickstart_demo.py)):
+
+```python
+from aidin_gripper import Gripper
+
+with Gripper() as g:
+    g.connect("/dev/ttyUSB0")     # 1-2. wire + connect
+    g.activate()                  # 3. activate
+    g.home()                      # 4. home (hands clear!)
+    g.move_to(255, speed=200, force=128, blocking=True)   # 5. close
+    g.move_to(0,   speed=200, force=128, blocking=True)   # 5. open
+    print(g.read_state())         # 6. status
+```
+
+Full per-SDK instructions: [python/README.md](python/README.md) ·
+[cpp/README.md](cpp/README.md) · [ros2/README.md](ros2/README.md).
+
+## Quick start (Python)
+
+```bash
+git clone <this-repo> aidin-2f-gripper-ros2
+cd aidin-2f-gripper-ros2/python
+
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\Activate.ps1
+pip install -e .
+
+cd examples
+python 06_full_quickstart_demo.py /dev/ttyUSB0   # Windows: COM3
+```
+
+More examples (activate/home, single open+close, cyclic loop, status,
+fault + emergency release): [python/README.md](python/README.md#run-the-examples).
+
 ## Quick start (ROS2)
 
 ```bash

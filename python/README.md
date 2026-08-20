@@ -61,11 +61,23 @@ pip install "pymodbus>=3.0,<4.0" pyserial
 
 ## Run the examples
 
+| File | Demonstrates |
+|---|---|
+| `examples/01_activate_and_home.py` | Minimal startup sequence: activate + home |
+| `examples/02_open_and_close.py` | One close + one open move (assumes already activated/homed) |
+| `examples/03_open_close_loop.py` | Repeated open/close cycles with blocking moves and SIGINT (CTRL+C) handling |
+| `examples/04_get_status.py` | Read status once, or `--watch` to poll @ 100 ms and print on change |
+| `examples/05_fault_and_emergency_release.py` | Inspect `fault`/`latched_fault`, call `emergency_release()`, recover with `activate()` |
+| `examples/06_full_quickstart_demo.py` | End-to-end: connect → activate → home → close → open → status |
+
 ```bash
 cd examples
-python 01_activate_and_home.py /dev/ttyUSB0
-python 02_open_close_loop.py   /dev/ttyUSB0 5
-python 03_status_monitor.py    /dev/ttyUSB0
+python 01_activate_and_home.py           /dev/ttyUSB0
+python 02_open_and_close.py              /dev/ttyUSB0
+python 03_open_close_loop.py             /dev/ttyUSB0 5
+python 04_get_status.py                  /dev/ttyUSB0 --watch
+python 05_fault_and_emergency_release.py /dev/ttyUSB0 open
+python 06_full_quickstart_demo.py        /dev/ttyUSB0
 ```
 
 Windows: pass `COM3` (or your actual port) instead.

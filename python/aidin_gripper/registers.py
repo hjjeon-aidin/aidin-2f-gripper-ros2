@@ -55,3 +55,12 @@ CFG_SERIAL_HI:  Final[int] = 0x0189
 
 DEV_CMD:    Final[int] = 0x0180
 DEV_STATUS: Final[int] = 0x0181
+
+# DEV_CMD codes (docs/protocol/protocol.md §3 - full list lives there)
+DEV_CMD_FAULT_CLEAR: Final[int] = 0x07
+
+# DEV_STATUS codes
+DEV_STATUS_IDLE:    Final[int] = 0x00
+DEV_STATUS_RUNNING: Final[int] = 0x01
+DEV_STATUS_OK:      Final[int] = 0x02
+DEV_STATUS_ERROR:   Final[int] = 0x03

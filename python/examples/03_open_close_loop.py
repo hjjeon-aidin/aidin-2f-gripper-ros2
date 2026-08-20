@@ -1,8 +1,10 @@
-"""Example 2: Repeatedly open and close the gripper.
+"""Example 3: Repeatedly open and close the gripper (cyclic stress test).
+
+For a single open/close pass see 02_open_and_close.py.
 
 Usage:
-    python 02_open_close_loop.py /dev/ttyUSB0 [cycles]
-    python 02_open_close_loop.py COM3 [cycles]
+    python 03_open_close_loop.py /dev/ttyUSB0 [cycles]
+    python 03_open_close_loop.py COM3 [cycles]
 """
 import signal
 import sys
