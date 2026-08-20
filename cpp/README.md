@@ -83,8 +83,8 @@ cmake -B build -DAIDIN_BUILD_EXAMPLES=OFF
 
 | Method | Purpose |
 |---|---|
-| `connect(port, baud=115200, parity='N', slaveId=1)` | Open serial link |
-| `disconnect()`                                       | Close link |
+| `connect(port, baud=115200, parity='N', slaveId=1)` | Open serial link (shared automatically with other `Gripper`s already on the same port - see "Multiple grippers on one bus" below) |
+| `disconnect()`                                       | Close link (only actually closes the port once every sharer has disconnected) |
 | `activate()`                                         | Set rACT=1, wait until gripper reports `Active` |
 | `stop()`                                             | Stop an in-flight motion (rGTO=0), keep holding |
 | `home(timeout=15s)`                                  | Trigger homing, block until `gHOM=1` |
@@ -96,6 +96,26 @@ cmake -B build -DAIDIN_BUILD_EXAMPLES=OFF
 
 All methods throw `aidin::GripperError` (derived from `std::runtime_error`)
 on Modbus failure or timeout.
+
+## Multiple grippers on one bus (RS485 multi-drop)
+
+RS485 is a shared, half-duplex bus: several grippers can sit on the same
+wire pair as long as each has a distinct Modbus slave address (set once via
+`CFG_MB_ADDR`, one device at a time, before wiring them together).
+
+```cpp
+aidin::Gripper a, b;
+a.connect("/dev/ttyUSB0", 115200, 'N', /*slaveId=*/1);
+b.connect("/dev/ttyUSB0", 115200, 'N', /*slaveId=*/2);   // reuses a's connection
+```
+
+The second `connect()` call to the same port path transparently shares the
+first one's already-open serial connection instead of opening the port
+again (which fails outright on Windows and can corrupt the bus on Linux).
+`baudrate`/`parity` must match across every `connect()` call for a given
+port - those belong to the physical link, not to one device - a mismatch
+throws `GripperError`. Each Modbus transaction is serialized with an
+internal mutex, so driving both grippers from separate threads is safe too.
 
 ## Examples
 

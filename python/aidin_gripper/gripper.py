@@ -9,6 +9,7 @@ Mirrors the C++ SDK API:
 """
 from __future__ import annotations
 
+import threading
 import time
 from contextlib import contextmanager
 from typing import Optional
@@ -23,12 +24,50 @@ _POLL_INTERVAL_S = 0.02
 _DEFAULT_TIMEOUT_S = 0.5
 
 
+class _SharedPort:
+    """One physical serial connection, shared by every Gripper on it.
+
+    RS485 is a half-duplex multi-drop bus: several grippers with distinct
+    slave IDs can sit on the same wire, but only one Modbus transaction
+    may be in flight at a time. Gripper.connect() looks up (or creates)
+    one of these per port path so several Gripper instances - each with
+    its own slave_id - share one pymodbus client instead of each trying
+    to open the OS serial handle for themselves (which fails outright on
+    Windows, and silently corrupts the bus on Linux).
+    """
+
+    def __init__(self, client: ModbusSerialClient, baudrate: int, parity: str) -> None:
+        self.client = client
+        self.baudrate = baudrate
+        self.parity = parity
+        self.lock = threading.Lock()
+        self.ref_count = 0
+
+
+_port_registry: dict[str, _SharedPort] = {}
+_registry_lock = threading.Lock()
+
+
 class Gripper:
-    """Controls one AIDIN BLDC gripper over Modbus RTU."""
+    """Controls one AIDIN BLDC gripper over Modbus RTU.
+
+    Several Gripper instances may connect() to the same port with
+    different slave_id values to drive multiple grippers wired on one
+    RS485 multi-drop bus - the underlying serial connection is opened
+    once and shared (see _SharedPort). Each device must already have a
+    distinct slave address programmed (registers.CFG_MB_ADDR) before
+    being wired onto a shared bus.
+    """
 
     def __init__(self) -> None:
         self._client: Optional[ModbusSerialClient] = None
+        self._shared: Optional[_SharedPort] = None
+        self._port: Optional[str] = None
         self._slave_id: int = 1
+
+    @property
+    def slave_id(self) -> int:
+        return self._slave_id
 
     # ---------------------------- Lifecycle ----------------------------
     def connect(
@@ -42,21 +81,42 @@ class Gripper:
         """Open serial port and verify the slave responds.
 
         port: "/dev/ttyUSB0" on Linux, "COM3" on Windows.
+
+        If another Gripper already has this port open (e.g. a second
+        device at a different slave_id on the same RS485 bus), the
+        existing connection is reused instead of opening the port again -
+        baudrate/parity must match, since those belong to the shared
+        physical link, not to one slave_id. response_timeout_s only takes
+        effect on the connect() call that actually opens the port.
         """
         self.disconnect()
 
-        client = ModbusSerialClient(
-            port=port,
-            baudrate=baudrate,
-            parity=parity,
-            stopbits=1,
-            bytesize=8,
-            timeout=response_timeout_s,
-        )
-        if not client.connect():
-            raise GripperError(f"Cannot open serial port {port!r}")
+        with _registry_lock:
+            shared = _port_registry.get(port)
+            if shared is None:
+                client = ModbusSerialClient(
+                    port=port,
+                    baudrate=baudrate,
+                    parity=parity,
+                    stopbits=1,
+                    bytesize=8,
+                    timeout=response_timeout_s,
+                )
+                if not client.connect():
+                    raise GripperError(f"Cannot open serial port {port!r}")
+                shared = _SharedPort(client, baudrate, parity)
+                _port_registry[port] = shared
+            elif shared.baudrate != baudrate or shared.parity != parity:
+                raise GripperError(
+                    f"{port!r} is already open at {shared.baudrate} baud "
+                    f"parity={shared.parity!r}; every device on one RS485 "
+                    f"bus must share the same baudrate/parity"
+                )
+            shared.ref_count += 1
 
-        self._client = client
+        self._shared = shared
+        self._client = shared.client
+        self._port = port
         self._slave_id = slave_id
 
         # Sanity check: a single read to confirm the slave is alive.
@@ -67,12 +127,21 @@ class Gripper:
             raise
 
     def disconnect(self) -> None:
-        if self._client is not None:
-            try:
-                self._client.close()
-            except Exception:
-                pass
-            self._client = None
+        if self._shared is None:
+            return
+        port, shared = self._port, self._shared
+        with _registry_lock:
+            shared.ref_count -= 1
+            if shared.ref_count <= 0:
+                try:
+                    shared.client.close()
+                except Exception:
+                    pass
+                if port is not None:
+                    _port_registry.pop(port, None)
+        self._shared = None
+        self._client = None
+        self._port = None
 
     @property
     def is_connected(self) -> bool:
@@ -210,21 +279,23 @@ class Gripper:
         self._write1(pdu_addr, value)
 
     # ---------------------------- internals ----------------------------
-    def _require_client(self) -> ModbusSerialClient:
-        if self._client is None:
+    def _require_shared(self) -> _SharedPort:
+        if self._shared is None:
             raise GripperError("not connected")
-        return self._client
+        return self._shared
 
     def _write1(self, addr: int, value: int) -> None:
-        c = self._require_client()
-        rr = c.write_register(addr, value & 0xFFFF, slave=self._slave_id)
+        shared = self._require_shared()
+        with shared.lock:
+            rr = shared.client.write_register(addr, value & 0xFFFF, slave=self._slave_id)
         if rr.isError():
             raise GripperError(
                 f"write_register(0x{addr:04X}, 0x{value:04X}) failed: {rr}")
 
     def _read_block(self, addr: int, count: int) -> list[int]:
-        c = self._require_client()
-        rr = c.read_holding_registers(addr, count=count, slave=self._slave_id)
+        shared = self._require_shared()
+        with shared.lock:
+            rr = shared.client.read_holding_registers(addr, count=count, slave=self._slave_id)
         if rr.isError():
             raise GripperError(
                 f"read_holding_registers(0x{addr:04X}, {count}) failed: {rr}")

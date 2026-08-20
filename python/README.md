@@ -69,6 +69,7 @@ pip install "pymodbus>=3.0,<4.0" pyserial
 | `examples/04_get_status.py` | Read status once, or `--watch` to poll @ 100 ms and print on change |
 | `examples/05_fault_and_emergency_release.py` | Inspect `fault`/`latched_fault`, call `emergency_release()`, recover with `activate()` |
 | `examples/06_full_quickstart_demo.py` | End-to-end: connect → activate → home → close → open → status |
+| `examples/07_multi_gripper_two_slaves.py` | Two grippers, one RS485 bus, two slave IDs (shared serial connection) |
 
 ```bash
 cd examples
@@ -78,16 +79,61 @@ python 03_open_close_loop.py             /dev/ttyUSB0 5
 python 04_get_status.py                  /dev/ttyUSB0 --watch
 python 05_fault_and_emergency_release.py /dev/ttyUSB0 open
 python 06_full_quickstart_demo.py        /dev/ttyUSB0
+python 07_multi_gripper_two_slaves.py    /dev/ttyUSB0 1 2
 ```
 
 Windows: pass `COM3` (or your actual port) instead.
+
+## Multiple grippers on one bus (RS485 multi-drop)
+
+RS485 is a shared, half-duplex bus: several grippers can sit on the same
+wire pair as long as each has a distinct Modbus slave address.
+
+1. **Give each device a distinct address first**, one at a time, alone on
+   the bus (two units left at the factory default of `1` would both
+   answer at once and collide):
+   ```python
+   from aidin_gripper import Gripper, registers as reg
+
+   with Gripper() as g:
+       g.connect("/dev/ttyUSB0")             # default slave_id=1
+       g.write_register(reg.CFG_MB_ADDR, 2)  # reassign this unit to slave 2
+       # Persist to flash: write the SAVE_CONFIG developer command to
+       # reg.DEV_CMD. The command code is factory-tool territory - see
+       # "Changing baud rate / slave ID" in ../cpp/MANUAL.md and the
+       # firmware protocol docs for the exact value.
+   ```
+   After the firmware saves and restarts its UART, reconnect at the new
+   `slave_id`.
+
+2. **Wire both units onto the same bus**, then just `connect()` two
+   `Gripper` instances to the same port with different `slave_id`:
+   ```python
+   from aidin_gripper import Gripper
+
+   with Gripper() as a, Gripper() as b:
+       a.connect("/dev/ttyUSB0", slave_id=1)
+       b.connect("/dev/ttyUSB0", slave_id=2)   # reuses a's serial connection
+       print(a.read_state())
+       print(b.read_state())
+   ```
+   The second `connect()` call to the same port path transparently shares
+   the first one's already-open serial connection instead of opening the
+   port again (which fails on Windows and can corrupt the bus on Linux).
+   `baudrate`/`parity` must match across every `connect()` call for a
+   given port — those are properties of the physical link, not of one
+   device. Each Modbus transaction (one register read or write) is
+   serialized with an internal lock, so it's safe to drive both grippers
+   from separate threads too. See
+   [`examples/07_multi_gripper_two_slaves.py`](examples/07_multi_gripper_two_slaves.py).
 
 ## API at a glance
 
 | Method | Purpose |
 |---|---|
-| `connect(port, baudrate=115200, parity='N', slave_id=1)` | Open serial link |
-| `disconnect()`                                            | Close link |
+| `connect(port, baudrate=115200, parity='N', slave_id=1)` | Open serial link (shared automatically with other `Gripper`s already on the same port) |
+| `disconnect()`                                            | Close link (only actually closes the port once every sharer has disconnected) |
+| `slave_id` (property)                                     | This instance's Modbus slave address |
 | `activate(timeout_s=3.0)`                                 | rACT=1, wait for ACTIVE |
 | `deactivate()`                                            | rACT=0 |
 | `home(timeout_s=15.0)`                                    | Rising-edge homing, wait for gHOM=1 |

@@ -5,6 +5,9 @@
 #include "aidin/registers.hpp"
 
 #include <array>
+#include <map>
+#include <mutex>
+#include <optional>
 #include <thread>
 
 namespace aidin {
@@ -25,36 +28,71 @@ std::string hexAddr(uint16_t addr) {
     return s;
 }
 
+// One physical serial connection, shared by every Gripper on it.
+//
+// ModbusRtu is not thread-safe and RS485 is a half-duplex multi-drop bus
+// (only one transaction may be in flight at a time), so several Gripper
+// instances - each with its own slave ID - share one SharedBus instead of
+// each trying to open the OS serial handle for the same port (which fails
+// outright on Windows and can silently corrupt the bus on Linux).
+struct SharedBus {
+    ModbusRtu  bus;
+    std::mutex mutex;
+    int        baudrate = 0;
+    char       parity   = 'N';
+};
+
+std::mutex& registryMutex() {
+    static std::mutex m;
+    return m;
+}
+
+// weak_ptr: once every Gripper sharing a port disconnects, the SharedBus is
+// destroyed (closing the port via ~ModbusRtu) without any manual refcount
+// bookkeeping; a stale/expired entry is simply replaced on the next connect().
+std::map<std::string, std::weak_ptr<SharedBus>>& portRegistry() {
+    static std::map<std::string, std::weak_ptr<SharedBus>> registry;
+    return registry;
+}
+
 } // namespace
 
 struct Gripper::Impl {
-    ModbusRtu bus;
+    std::shared_ptr<SharedBus> shared;
     uint8_t   slaveId      = 1;
     uint16_t  lastAction   = 0;   // last ACTION written (rGTO pulse decision)
     int       lastPosition = -1;  // last rPR written, -1 = none yet
+    // Set by setResponseTimeout() before the port that creates it is open;
+    // applied once connect() actually opens a fresh SharedBus.
+    std::optional<std::chrono::milliseconds> pendingTimeout;
 
     void write1(uint16_t addr, uint16_t value) {
-        if (!bus.isOpen()) throw GripperError("not connected");
-        if (!bus.writeSingle(slaveId, addr, value)) {
-            throw GripperError("write " + hexAddr(addr) + " failed: " + bus.lastError());
+        if (!shared) throw GripperError("not connected");
+        {
+            std::lock_guard<std::mutex> lock(shared->mutex);
+            if (!shared->bus.writeSingle(slaveId, addr, value)) {
+                throw GripperError("write " + hexAddr(addr) + " failed: " + shared->bus.lastError());
+            }
         }
         if (addr == reg::ACTION)   lastAction   = value;
         if (addr == reg::POSITION) lastPosition = static_cast<int>(value & 0xFF);
     }
 
     uint16_t read1(uint16_t addr) {
-        if (!bus.isOpen()) throw GripperError("not connected");
+        if (!shared) throw GripperError("not connected");
         uint16_t v = 0;
-        if (!bus.readHolding(slaveId, addr, 1, &v)) {
-            throw GripperError("read " + hexAddr(addr) + " failed: " + bus.lastError());
+        std::lock_guard<std::mutex> lock(shared->mutex);
+        if (!shared->bus.readHolding(slaveId, addr, 1, &v)) {
+            throw GripperError("read " + hexAddr(addr) + " failed: " + shared->bus.lastError());
         }
         return v;
     }
 
     void readBlock(uint16_t addr, uint16_t count, uint16_t* out) {
-        if (!bus.isOpen()) throw GripperError("not connected");
-        if (!bus.readHolding(slaveId, addr, count, out)) {
-            throw GripperError("read block " + hexAddr(addr) + " failed: " + bus.lastError());
+        if (!shared) throw GripperError("not connected");
+        std::lock_guard<std::mutex> lock(shared->mutex);
+        if (!shared->bus.readHolding(slaveId, addr, count, out)) {
+            throw GripperError("read block " + hexAddr(addr) + " failed: " + shared->bus.lastError());
         }
     }
 };
@@ -72,19 +110,56 @@ void Gripper::connect(const std::string& port,
     if (slaveId < 1 || slaveId > 247) {
         throw GripperError("slave id out of range (1..247)");
     }
-    if (!p_->bus.open(port, baudrate, parity)) {
-        throw GripperError("connect failed: " + p_->bus.lastError());
+
+    std::shared_ptr<SharedBus> shared;
+    {
+        std::lock_guard<std::mutex> lock(registryMutex());
+        auto& registry = portRegistry();
+        auto  it = registry.find(port);
+        if (it != registry.end()) shared = it->second.lock();
+
+        if (shared) {
+            // Another Gripper already has this port open (e.g. a second
+            // device at a different slaveId on the same RS485 bus) -
+            // baudrate/parity are properties of the shared physical link,
+            // not of one slave, and must match.
+            if (shared->baudrate != baudrate || shared->parity != parity) {
+                throw GripperError(
+                    "'" + port + "' is already open at " + std::to_string(shared->baudrate) +
+                    " baud parity='" + std::string(1, shared->parity) +
+                    "'; every device on one RS485 bus must share the same baudrate/parity");
+            }
+        } else {
+            shared = std::make_shared<SharedBus>();
+            if (!shared->bus.open(port, baudrate, parity)) {
+                throw GripperError("connect failed: " + shared->bus.lastError());
+            }
+            if (p_->pendingTimeout) {
+                shared->bus.setResponseTimeout(*p_->pendingTimeout);
+            }
+            shared->baudrate = baudrate;
+            shared->parity   = parity;
+            registry[port]   = shared;
+        }
     }
+
+    p_->shared       = shared;
     p_->slaveId      = static_cast<uint8_t>(slaveId);
     p_->lastAction   = 0;
     p_->lastPosition = -1;
 }
 
-void Gripper::disconnect() noexcept { p_->bus.close(); }
-bool Gripper::isConnected() const noexcept { return p_->bus.isOpen(); }
+void Gripper::disconnect() noexcept { p_->shared.reset(); }
+bool Gripper::isConnected() const noexcept { return p_->shared && p_->shared->bus.isOpen(); }
 
 void Gripper::setResponseTimeout(std::chrono::milliseconds t) {
-    p_->bus.setResponseTimeout(t);
+    if (p_->shared) {
+        p_->shared->bus.setResponseTimeout(t);
+    } else {
+        // Not connected yet - remember it and apply once connect() opens
+        // (or joins) a port.
+        p_->pendingTimeout = t;
+    }
 }
 
 void Gripper::activate(std::chrono::milliseconds timeout) {
