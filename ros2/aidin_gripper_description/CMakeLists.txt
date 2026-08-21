@@ -1,14 +1,9 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.16)
+project(aidin_gripper_description)
 
-project(ASSY_URDF.SLDASM3)
+find_package(ament_cmake REQUIRED)
 
-find_package(catkin REQUIRED)
+install(DIRECTORY urdf meshes config launch
+    DESTINATION share/${PROJECT_NAME})
 
-catkin_package()
-
-find_package(roslaunch)
-
-foreach(dir config launch meshes urdf)
-	install(DIRECTORY ${dir}/
-		DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/${dir})
-endforeach(dir)
+ament_package()
