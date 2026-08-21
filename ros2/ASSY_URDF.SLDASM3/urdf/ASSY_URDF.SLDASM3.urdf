@@ -3,7 +3,7 @@
      Commit Version: 1.6.0-4-g7f85cfe  Build Version: 1.6.7995.38578
      For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
 <robot
-  name="ASSY_URDF.SLDASM2">
+  name="ASSY_URDF.SLDASM3">
   <link
     name="gripper_base">
     <inertial>
@@ -26,7 +26,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://ASSY_URDF.SLDASM2/meshes/gripper_base.STL" />
+          filename="package://ASSY_URDF.SLDASM3/meshes/gripper_base.STL" />
       </geometry>
       <material
         name="">
@@ -40,7 +40,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://ASSY_URDF.SLDASM2/meshes/gripper_base.STL" />
+          filename="package://ASSY_URDF.SLDASM3/meshes/gripper_base.STL" />
       </geometry>
     </collision>
   </link>
@@ -48,17 +48,17 @@
     name="gripper_joint_1">
     <inertial>
       <origin
-        xyz="0.0045868 -9.1778E-09 0.025065"
+        xyz="9.1778E-09 0.025065 -0.0045868"
         rpy="0 0 0" />
       <mass
         value="0.025712" />
       <inertia
-        ixx="7.7317E-06"
-        ixy="2.5553E-12"
-        ixz="6.3858E-07"
-        iyy="7.1205E-06"
-        iyz="2.953E-12"
-        izz="1.241E-06" />
+        ixx="7.1205E-06"
+        ixy="-2.953E-12"
+        ixz="2.5553E-12"
+        iyy="1.241E-06"
+        iyz="-6.3858E-07"
+        izz="7.7317E-06" />
     </inertial>
     <visual>
       <origin
@@ -66,7 +66,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://ASSY_URDF.SLDASM2/meshes/gripper_joint_1.STL" />
+          filename="package://ASSY_URDF.SLDASM3/meshes/gripper_joint_1.STL" />
       </geometry>
       <material
         name="">
@@ -80,7 +80,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://ASSY_URDF.SLDASM2/meshes/gripper_joint_1.STL" />
+          filename="package://ASSY_URDF.SLDASM3/meshes/gripper_joint_1.STL" />
       </geometry>
     </collision>
   </link>
@@ -88,17 +88,17 @@
     name="gripper_joint_1_joint"
     type="prismatic">
     <origin
-      xyz="0 -0.06 0.0525"
-      rpy="1.5708 -1.5708 0" />
+      xyz="0 0.0525 0.06"
+      rpy="1.5708 0 0" />
     <parent
       link="gripper_base" />
     <child
       link="gripper_joint_1" />
     <axis
-      xyz="1 0 0" />
+      xyz="0 0 -1" />
     <limit
       lower="0"
-      upper="0.0525"
+      upper="0"
       effort="0"
       velocity="0" />
   </joint>
@@ -106,17 +106,17 @@
     name="gripper_joint_2">
     <inertial>
       <origin
-        xyz="0.0045868 -9.1778E-09 0.025065"
+        xyz="-9.1778E-09 -0.025065 -0.0045868"
         rpy="0 0 0" />
       <mass
         value="0.025712" />
       <inertia
-        ixx="7.7317E-06"
-        ixy="2.5553E-12"
-        ixz="6.3858E-07"
-        iyy="7.1205E-06"
-        iyz="2.953E-12"
-        izz="1.241E-06" />
+        ixx="7.1205E-06"
+        ixy="-2.953E-12"
+        ixz="-2.5553E-12"
+        iyy="1.241E-06"
+        iyz="6.3858E-07"
+        izz="7.7317E-06" />
     </inertial>
     <visual>
       <origin
@@ -124,7 +124,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://ASSY_URDF.SLDASM2/meshes/gripper_joint_2.STL" />
+          filename="package://ASSY_URDF.SLDASM3/meshes/gripper_joint_2.STL" />
       </geometry>
       <material
         name="">
@@ -138,7 +138,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://ASSY_URDF.SLDASM2/meshes/gripper_joint_2.STL" />
+          filename="package://ASSY_URDF.SLDASM3/meshes/gripper_joint_2.STL" />
       </geometry>
     </collision>
   </link>
@@ -146,17 +146,17 @@
     name="gripper_joint_2_joint"
     type="prismatic">
     <origin
-      xyz="0 -0.06 0.0145"
-      rpy="1.5708 1.5708 0" />
+      xyz="0 -0.0525 0.06"
+      rpy="-1.5708 0 0" />
     <parent
       link="gripper_base" />
     <child
       link="gripper_joint_2" />
     <axis
-      xyz="1 0 0" />
+      xyz="0 0 -1" />
     <limit
       lower="0"
-      upper="0.0525"
+      upper="0"
       effort="0"
       velocity="0" />
   </joint>
