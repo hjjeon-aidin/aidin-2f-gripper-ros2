@@ -1,0 +1,162 @@
+<?xml version="1.0"?>
+<!--
+  aidin_gripper_simple.urdf
+  ─────────────────────────────────────────────────────────────
+  RB-Y1 그리퍼와 동일한 구조: [EE 링크] + [핑거 2개], 링키지 없음.
+  오프셋 슬라이더-크랭크는 URDF(트리 구조)로 표현 불가하므로
+  "입력 각도 → 핑거 직선 변위" 결과만 prismatic 1축으로 대체한다.
+
+  ※ CAPS 표기된 값은 SolidWorks 질량특성/치수에서 채워 넣을 자리.
+  ※ 길이 단위 m, 질량 kg, 관성 kg·m^2  (STL은 mm이므로 scale 0.001)
+-->
+<robot name="aidin_gripper">
+
+  <!-- ══════════════════════════════════════════════════════════
+       1. 베이스 (하우징 + 모터 + 감속기 + 링키지 전부 여기에 흡수)
+       원점: ISO 9409-1-50-4-M6 플랜지 장착면 중심, +Z = 접근 방향
+       ══════════════════════════════════════════════════════════ -->
+  <link name="gripper_base">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://aidin_gripper_description/meshes/visual/gripper_base.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="dark_gray">
+        <color rgba="0.25 0.25 0.28 1.0"/>
+      </material>
+    </visual>
+
+    <!-- 충돌체는 반드시 단순 형상으로. 메시 재사용 금지(성능/안정성) -->
+    <collision>
+      <origin xyz="0 0 BASE_CZ" rpy="0 0 0"/>
+      <geometry>
+        <box size="BASE_X BASE_Y BASE_Z"/>
+      </geometry>
+    </collision>
+
+    <inertial>
+      <!-- SolidWorks: 무게중심 좌표를 gripper_base 좌표계 기준으로 -->
+      <origin xyz="COM_X COM_Y COM_Z" rpy="0 0 0"/>
+      <mass value="BASE_MASS"/>
+      <inertia ixx="IXX" ixy="IXY" ixz="IXZ"
+                          iyy="IYY" iyz="IYZ"
+                                    izz="IZZ"/>
+    </inertial>
+  </link>
+
+  <!-- ══════════════════════════════════════════════════════════
+       2. 왼쪽 핑거 — 구동축 (이 축 하나만 명령 대상)
+       ══════════════════════════════════════════════════════════ -->
+  <joint name="gripper_finger_1_joint" type="prismatic">
+    <parent link="gripper_base"/>
+    <child  link="gripper_finger_1"/>
+    <!-- 핑거가 완전히 닫힌 상태(0)에서의 위치를 원점으로 잡는다 -->
+    <origin xyz="0 FINGER_Y0 FINGER_Z0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <!-- lower=0(닫힘), upper=편측 스트로크. 전체 개구폭 = 2 × upper -->
+    <limit lower="0.0" upper="STROKE_HALF"
+           effort="MAX_FORCE_N" velocity="MAX_SPEED_MPS"/>
+    <dynamics damping="0.1" friction="0.0"/>
+  </joint>
+
+  <link name="gripper_finger_1">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://aidin_gripper_description/meshes/visual/gripper_finger.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="light_gray">
+        <color rgba="0.75 0.75 0.78 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="FIN_CX FIN_CY FIN_CZ" rpy="0 0 0"/>
+      <geometry>
+        <box size="FIN_X FIN_Y FIN_Z"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="FCOM_X FCOM_Y FCOM_Z" rpy="0 0 0"/>
+      <mass value="FINGER_MASS"/>
+      <inertia ixx="FIXX" ixy="0" ixz="0"
+                          iyy="FIYY" iyz="0"
+                                     izz="FIZZ"/>
+    </inertial>
+  </link>
+
+  <!-- ══════════════════════════════════════════════════════════
+       3. 오른쪽 핑거 — mimic (기구적으로 구속되므로 자유도 아님)
+       axis를 -Y로 두고 multiplier=1 → 대칭 개폐
+       ══════════════════════════════════════════════════════════ -->
+  <joint name="gripper_finger_2_joint" type="prismatic">
+    <parent link="gripper_base"/>
+    <child  link="gripper_finger_2"/>
+    <origin xyz="0 -FINGER_Y0 FINGER_Z0" rpy="0 0 3.14159265"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="0.0" upper="STROKE_HALF"
+           effort="MAX_FORCE_N" velocity="MAX_SPEED_MPS"/>
+    <mimic joint="gripper_finger_1_joint" multiplier="1.0" offset="0.0"/>
+    <dynamics damping="0.1" friction="0.0"/>
+  </joint>
+
+  <link name="gripper_finger_2">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://aidin_gripper_description/meshes/visual/gripper_finger.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="light_gray"/>
+    </visual>
+    <collision>
+      <origin xyz="FIN_CX FIN_CY FIN_CZ" rpy="0 0 0"/>
+      <geometry>
+        <box size="FIN_X FIN_Y FIN_Z"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="FCOM_X FCOM_Y FCOM_Z" rpy="0 0 0"/>
+      <mass value="FINGER_MASS"/>
+      <inertia ixx="FIXX" ixy="0" ixz="0"
+                          iyy="FIYY" iyz="0"
+                                     izz="FIZZ"/>
+    </inertial>
+  </link>
+
+  <!-- ══════════════════════════════════════════════════════════
+       4. TCP — 파지점. IK 타겟으로 쓰는 가상 프레임
+       ══════════════════════════════════════════════════════════ -->
+  <link name="gripper_tcp"/>
+  <joint name="gripper_tcp_joint" type="fixed">
+    <parent link="gripper_base"/>
+    <child  link="gripper_tcp"/>
+    <origin xyz="0 0 TCP_Z" rpy="0 0 0"/>
+  </joint>
+
+</robot>
+
+<!--
+  ─────────────────────────────────────────────────────────────
+  적용 시 주의사항
+
+  [mimic 지원 현황]
+  · KDL / MoveIt / RViz / PyBullet(수동 constraint 필요) : 지원 또는 우회 가능
+  · Isaac Sim  : mimic → tendon 으로 해석되어 탄성 거동. 물리 정확도 필요하면
+                 import 후 joint drive 직접 설정하거나 fixed로 대체 권장
+  · MuJoCo     : equality/joint constraint 로 변환 필요
+
+  [더 단순화하고 싶다면 = RB-Y1 방식]
+  RB-Y1은 그리퍼 조인트를 로봇 kinematic chain에서 아예 빼고
+  (SDK가 노출하는 24개 조인트에 그리퍼 없음) 별도 채널로 제어한다.
+  IK/충돌검사용으로만 쓸 거면 두 prismatic을 fixed 로 바꾸고
+  "최대 개방" 자세 하나만 모델링하는 것이 가장 안전하다.
+
+  [상위 로봇에 붙이기]
+  <joint name="ee_to_gripper" type="fixed">
+    <parent link="link_right_arm_6"/>   <!-- RB-Y1 arm tip -->
+    <child  link="gripper_base"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>   <!-- ISO 9409-1-50-4-M6 정합 -->
+  </joint>
+-->

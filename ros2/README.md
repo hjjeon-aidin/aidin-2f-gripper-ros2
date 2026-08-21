@@ -103,9 +103,10 @@ cd aidin-2f-gripper-ros2
 
 # 2. Symlink the ROS2 packages into your workspace
 mkdir -p ~/ros2_ws/src
-ln -s $(pwd)/ros2/aidin_gripper_msgs     ~/ros2_ws/src/
-ln -s $(pwd)/ros2/aidin_gripper_driver   ~/ros2_ws/src/
-ln -s $(pwd)/ros2/aidin_gripper_examples ~/ros2_ws/src/
+ln -s $(pwd)/ros2/aidin_gripper_msgs        ~/ros2_ws/src/
+ln -s $(pwd)/ros2/aidin_gripper_driver      ~/ros2_ws/src/
+ln -s $(pwd)/ros2/aidin_gripper_examples    ~/ros2_ws/src/
+ln -s $(pwd)/ros2/aidin_gripper_description ~/ros2_ws/src/
 
 # 3. Build
 cd ~/ros2_ws
@@ -229,8 +230,12 @@ aidin-2f-gripper-ros2/
     │   ├── src/gripper_node.cpp
     │   ├── launch/aidin_gripper.launch.py
     │   └── config/default.yaml
-    └── aidin_gripper_examples/    # rclpy CLI clients
-        └── aidin_gripper_examples/{state_listener,open_close_loop,interactive_cli}.py
+    ├── aidin_gripper_examples/    # rclpy CLI clients
+    │   └── aidin_gripper_examples/{state_listener,open_close_loop,interactive_cli}.py
+    └── aidin_gripper_description/ # URDF + meshes for the gripper end-effector
+        ├── urdf/aidin_gripper.urdf         # fixed-finger, RB-Y1 style (no gripper DOF in the tree)
+        ├── urdf/aidin_gripper_simple.urdf  # prismatic 1-DOF template (SolidWorks 값 채우는 용도)
+        └── meshes/visual/{gripper_base,gripper_finger}.stl
 ```
 
 ---
