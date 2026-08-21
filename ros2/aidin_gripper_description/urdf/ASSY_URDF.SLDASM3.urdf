@@ -95,10 +95,10 @@
     <child
       link="gripper_joint_1" />
     <axis
-      xyz="0 0 -1" />
+      xyz="0 0 1" />
     <limit
       lower="0"
-      upper="0"
+      upper="0.0525"
       effort="0"
       velocity="0" />
   </joint>
@@ -153,10 +153,10 @@
     <child
       link="gripper_joint_2" />
     <axis
-      xyz="0 0 -1" />
+      xyz="0 0 1" />
     <limit
       lower="0"
-      upper="0"
+      upper="0.0525"
       effort="0"
       velocity="0" />
   </joint>
