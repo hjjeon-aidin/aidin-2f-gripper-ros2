@@ -63,8 +63,8 @@ semantics, and operational notes. For a quick build/run walk-through see
 ```bash
 sudo apt update
 sudo apt install -y build-essential cmake git
-git clone <repo-url> aidin-2f-gripper-ros2
-cd aidin-2f-gripper-ros2/cpp
+git clone <repo-url> aidin-2f-gripper-sdk
+cd aidin-2f-gripper-sdk/cpp
 cmake -B build
 cmake --build build -j$(nproc)
 ```
@@ -87,8 +87,8 @@ Prerequisites:
 - USB-RS485 adapter driver (FTDI / CH340 / CP210x).
 
 ```powershell
-git clone <repo-url> aidin-2f-gripper-ros2
-cd aidin-2f-gripper-ros2\cpp
+git clone <repo-url> aidin-2f-gripper-sdk
+cd aidin-2f-gripper-sdk\cpp
 cmake -B build -G "Visual Studio 17 2022"
 cmake --build build --config Release
 ```
@@ -99,7 +99,7 @@ Resulting binaries: `build\Release\01_activate_and_home.exe`, etc.
 
 Include it as a subdirectory:
 ```cmake
-add_subdirectory(path/to/aidin-2f-gripper-ros2/cpp)
+add_subdirectory(path/to/aidin-2f-gripper-sdk/cpp)
 target_link_libraries(my_app PRIVATE aidin::gripper)
 ```
 

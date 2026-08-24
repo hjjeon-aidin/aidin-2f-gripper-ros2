@@ -14,7 +14,8 @@ AIDIN 2지 BLDC 그리퍼용 호스트 소프트웨어 모음입니다. USB-RS48
 |---|---|---|
 | [`cpp/`](cpp/) | `aidin::Gripper` C++17 SDK — self-contained Modbus RTU framing (termios / Win32). Builds on Ubuntu & Windows with one CMake command | [README](cpp/README.md) · [MANUAL](cpp/MANUAL.md) |
 | [`python/`](python/) | Pure-Python SDK (`pyserial`) — same API surface as the C++ SDK | [README](python/README.md) |
-| [`ros2/`](ros2/) | ROS2 packages: `aidin_gripper_driver` (rclcpp node), `aidin_gripper_msgs`, `aidin_gripper_examples`, `aidin_gripper_description` (URDF/meshes). State topic @ 50 Hz + services (`activate`/`home`/`move_to`/`emergency_release`/…) | [README](ros2/README.md) |
+| [`ros2/`](ros2/) | ROS2 packages: `aidin_gripper_driver` (rclcpp node), `aidin_gripper_msgs`, `aidin_gripper_examples`. State topic @ 50 Hz + services (`activate`/`home`/`move_to`/`emergency_release`/…) | [README](ros2/README.md) |
+| [`urdf/`](urdf/) | `aidin_gripper_description` ROS2 package — URDF + meshes for the gripper end-effector | [ros2/README.md](ros2/README.md#workspace-layout) |
 
 ## Gripper operating procedure / 그리퍼 실행 절차
 
@@ -56,8 +57,8 @@ Full per-SDK instructions: [python/README.md](python/README.md) ·
 ## Quick start (Python)
 
 ```bash
-git clone <this-repo> aidin-2f-gripper-ros2
-cd aidin-2f-gripper-ros2/python
+git clone <this-repo> aidin-2f-gripper-sdk
+cd aidin-2f-gripper-sdk/python
 
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\Activate.ps1
@@ -73,8 +74,8 @@ fault + emergency release): [python/README.md](python/README.md#run-the-examples
 ## Quick start (ROS2)
 
 ```bash
-git clone <this-repo> aidin-2f-gripper-ros2
-cd aidin-2f-gripper-ros2
+git clone <this-repo> aidin-2f-gripper-sdk
+cd aidin-2f-gripper-sdk
 
 mkdir -p ~/ros2_ws/src
 ln -s $(pwd)/ros2/aidin_gripper_msgs     ~/ros2_ws/src/

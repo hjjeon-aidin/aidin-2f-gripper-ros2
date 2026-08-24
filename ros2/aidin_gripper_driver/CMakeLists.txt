@@ -22,7 +22,7 @@ set(AIDIN_SDK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../cpp" CACHE PATH
 if(NOT EXISTS "${AIDIN_SDK_DIR}/CMakeLists.txt")
     message(FATAL_ERROR
         "Cannot find aidin C++ SDK at '${AIDIN_SDK_DIR}'.\n"
-        "Either clone the full aidin-2f-gripper-ros2 repo so that cpp/ sits next to ros2/,\n"
+        "Either clone the full aidin-2f-gripper-sdk repo so that cpp/ sits next to ros2/,\n"
         "or pass -DAIDIN_SDK_DIR=/abs/path/to/cpp to colcon.")
 endif()
 

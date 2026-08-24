@@ -32,8 +32,8 @@ Default link parameters: **115200 baud, 8N1, slave ID 1**.
 
 ```bash
 sudo apt install build-essential cmake git
-git clone <this-repo> aidin-2f-gripper-ros2
-cd aidin-2f-gripper-ros2/cpp
+git clone <this-repo> aidin-2f-gripper-sdk
+cd aidin-2f-gripper-sdk/cpp
 cmake -B build
 cmake --build build -j
 ```
@@ -54,8 +54,8 @@ Install [CMake](https://cmake.org/download/) and Visual Studio 2019 / 2022
 (Build Tools workload is enough), then:
 
 ```powershell
-git clone <this-repo> aidin-2f-gripper-ros2
-cd aidin-2f-gripper-ros2\cpp
+git clone <this-repo> aidin-2f-gripper-sdk
+cd aidin-2f-gripper-sdk\cpp
 cmake -B build -G "Visual Studio 17 2022"
 cmake --build build --config Release
 ```

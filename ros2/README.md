@@ -97,16 +97,16 @@ external Modbus library, no network access at build time**.
 ## Build & Run
 
 ```bash
-# 1. Clone this repo (this gives you cpp/ + ros2/ side by side)
-git clone <this-repo> aidin-2f-gripper-ros2
-cd aidin-2f-gripper-ros2
+# 1. Clone this repo (this gives you cpp/ + ros2/ + urdf/ side by side)
+git clone <this-repo> aidin-2f-gripper-sdk
+cd aidin-2f-gripper-sdk
 
 # 2. Symlink the ROS2 packages into your workspace
 mkdir -p ~/ros2_ws/src
 ln -s $(pwd)/ros2/aidin_gripper_msgs        ~/ros2_ws/src/
 ln -s $(pwd)/ros2/aidin_gripper_driver      ~/ros2_ws/src/
 ln -s $(pwd)/ros2/aidin_gripper_examples    ~/ros2_ws/src/
-ln -s $(pwd)/ros2/aidin_gripper_description ~/ros2_ws/src/
+ln -s $(pwd)/urdf                           ~/ros2_ws/src/
 
 # 3. Build
 cd ~/ros2_ws
@@ -219,23 +219,23 @@ Set via `config/default.yaml` or on the command line.
 ## Workspace Layout
 
 ```
-aidin-2f-gripper-ros2/
+aidin-2f-gripper-sdk/
 ├── cpp/                           # aidin::Gripper C++17 SDK (self-contained Modbus RTU)
 ├── python/                        # pure-Python SDK (pyserial)
-└── ros2/
-    ├── aidin_gripper_msgs/        # msg + srv definitions
-    │   ├── msg/GripperState.msg
-    │   └── srv/{MoveTo,EmergencyRelease,DevCmd}.srv
-    ├── aidin_gripper_driver/      # rclcpp node, launch, config
-    │   ├── src/gripper_node.cpp
-    │   ├── launch/aidin_gripper.launch.py
-    │   └── config/default.yaml
-    ├── aidin_gripper_examples/    # rclpy CLI clients
-    │   └── aidin_gripper_examples/{state_listener,open_close_loop,interactive_cli}.py
-    └── aidin_gripper_description/ # URDF + meshes for the gripper end-effector
-        ├── urdf/aidin_gripper.urdf         # fixed-finger, RB-Y1 style (no gripper DOF in the tree)
-        ├── urdf/aidin_gripper_simple.urdf  # prismatic 1-DOF template (SolidWorks 값 채우는 용도)
-        └── meshes/visual/{gripper_base,gripper_finger}.stl
+├── ros2/
+│   ├── aidin_gripper_msgs/        # msg + srv definitions
+│   │   ├── msg/GripperState.msg
+│   │   └── srv/{MoveTo,EmergencyRelease,DevCmd}.srv
+│   ├── aidin_gripper_driver/      # rclcpp node, launch, config
+│   │   ├── src/gripper_node.cpp
+│   │   ├── launch/aidin_gripper.launch.py
+│   │   └── config/default.yaml
+│   └── aidin_gripper_examples/    # rclpy CLI clients
+│       └── aidin_gripper_examples/{state_listener,open_close_loop,interactive_cli}.py
+└── urdf/                          # `aidin_gripper_description` ROS2 package — URDF + meshes
+    ├── urdf/aidin_gripper.urdf         # fixed-finger, RB-Y1 style (no gripper DOF in the tree)
+    ├── urdf/aidin_gripper_simple.urdf  # prismatic 1-DOF template (SolidWorks 값 채우는 용도)
+    └── meshes/visual/{gripper_base,gripper_finger}.stl
 ```
 
 ---
@@ -250,7 +250,7 @@ aidin-2f-gripper-ros2/
 | State rate stutters below `publish_rate_hz`   | FTDI latency_timer at its 16 ms default               | `echo 1 \| sudo tee /sys/bus/usb-serial/devices/ttyUSB0/latency_timer` (udev 규칙으로 영속화 권장) |
 | `auto_activate failed`                        | Power supply too low, or latched fault                | Read `latched_fault` field in `/state`, then call `fault_clear` |
 | `move_to` reports `success=false`             | Mechanical jam, or `rATR` still latched               | Call `activate` to clear the latch |
-| `colcon build` cannot find SDK                | Workspace layout differs                              | Pass `--cmake-args -DAIDIN_SDK_DIR=/abs/path/to/aidin-2f-gripper-ros2/cpp` |
+| `colcon build` cannot find SDK                | Workspace layout differs                              | Pass `--cmake-args -DAIDIN_SDK_DIR=/abs/path/to/aidin-2f-gripper-sdk/cpp` |
 
 포트 이름 고정 + latency 자동 설정 udev 규칙 예 (`/etc/udev/rules.d/99-aidin-gripper.rules`,
 idVendor/idProduct 는 `lsusb` 로 확인):
