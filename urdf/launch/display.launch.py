@@ -9,7 +9,7 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     pkg = FindPackageShare("aidin_gripper_description")
-    default_model = PathJoinSubstitution([pkg, "urdf", "ASSY_URDF.SLDASM3.urdf"])
+    default_model = PathJoinSubstitution([pkg, "urdf", "aidin_2f_gripper.urdf"])
 
     robot_description = ParameterValue(
         Command(["cat ", LaunchConfiguration("model")]), value_type=str)

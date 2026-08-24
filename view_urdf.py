@@ -10,7 +10,7 @@ master joint every frame.
 
 Usage:
     py -m pip install mujoco
-    py view_urdf.py urdf/urdf/ASSY_URDF.SLDASM3.urdf
+    py view_urdf.py urdf/urdf/aidin_2f_gripper.urdf
 """
 import argparse
 import math

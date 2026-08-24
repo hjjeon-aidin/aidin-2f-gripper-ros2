@@ -233,9 +233,11 @@ aidin-2f-gripper-sdk/
 │   └── aidin_gripper_examples/    # rclpy CLI clients
 │       └── aidin_gripper_examples/{state_listener,open_close_loop,interactive_cli}.py
 └── urdf/                          # `aidin_gripper_description` ROS2 package — URDF + meshes
-    ├── urdf/aidin_gripper.urdf         # fixed-finger, RB-Y1 style (no gripper DOF in the tree)
-    ├── urdf/aidin_gripper_simple.urdf  # prismatic 1-DOF template (SolidWorks 값 채우는 용도)
-    └── meshes/visual/{gripper_base,gripper_finger}.stl
+    ├── urdf/aidin_2f_gripper.urdf     # SolidWorks-exported 2-finger prismatic model
+    ├── urdf/aidin_2f_gripper.csv      # SW2URDF link/joint export record (reference only)
+    ├── meshes/{gripper_base,gripper_joint_1,gripper_joint_2}.STL
+    ├── config/joint_names_aidin_2f_gripper.yaml
+    └── launch/{display,gazebo}.launch.py
 ```
 
 ---
