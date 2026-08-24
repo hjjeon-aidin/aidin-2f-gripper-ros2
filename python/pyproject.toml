@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aidin-gripper"
+version = "1.0.0"
+description = "Python SDK for the AIDIN BLDC gripper (DH-Robotics Modbus RTU)."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "AIDIN Robotics Firmware Team" }]
+keywords = ["modbus", "gripper", "aidin", "bldc", "robotics"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Hardware",
+]
+dependencies = [
+    "pymodbus>=3.0,<4.0",
+    "pyserial>=3.5",
+]
+
+[project.urls]
+Homepage = "http://aidin-robotics.example"
+Documentation = "../cpp/MANUAL.md"
+
+[tool.setuptools.packages.find]
+include = ["aidin_gripper*"]
+exclude = ["examples*", "tests*"]

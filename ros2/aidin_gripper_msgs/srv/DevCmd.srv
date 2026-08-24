@@ -1,0 +1,10 @@
+# Developer command passthrough (docs/protocol/protocol.md §3, DEV_CMD 0x0180).
+# Writes the command, then polls DEV_STATUS until OK/ERROR or timeout_sec.
+# Not advertised when the driver is built with -DAIDIN_ENABLE_DEV_CMD=OFF.
+
+uint8   cmd               # e.g. 0x04 SAVE_PID, 0x0A STROKE_CAL
+float32 timeout_sec 5.0   # completion wait; STROKE_CAL needs ~25 s
+---
+bool   success            # dev_status reached OK
+uint8  dev_status         # 0=IDLE 1=RUNNING 2=OK 3=ERROR
+string message
