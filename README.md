@@ -118,39 +118,56 @@ already exist here.
 - Transport: RS485 over a USB adapter. Default link: **115200 baud, 8 data
   bits, no parity, 1 stop bit (8N1)**, slave address **1** (changeable,
   1..247).
-- Function codes the SDKs in this repo actually use: **0x03** (Read Holding
-  Registers) and **0x06** (Write Single Register). Every register below is
-  a 16-bit holding register at its protocol-level (PDU) address.
-- The full authoritative protocol spec (fault code table, CAN-side sensor
-  commands, etc.) lives in a separate firmware repo (`aidin-bldc-firmware`,
-  `docs/protocol/protocol.md`) that is **not** included here — only what's
-  mirrored below and in
+- Function codes the device accepts: **0x03** (Read Holding Registers),
+  **0x06** (Write Single Register), **0x10** (Write Multiple Registers).
+  The SDKs in this repo use 0x03/0x06. Every register below is a 16-bit
+  holding register at its protocol-level (PDU) address.
+- Detailed per-register documentation — bit maps, value scaling, usage
+  sequences, Modbus frame examples — is in the **AIDIN Gripper Modbus RTU
+  Protocol Manual** (`aidin_modbus_rtu_manual.pdf` / `.html`, Manual Rev 2.0
+  · Spec v1.10.3, in the firmware repo `aidin-bldc-firmware/docs/`). The
+  canonical register contract is `docs/protocol/protocol.md` in the same
+  repo. Neither is included here — only the **core registers** mirrored in
   [`cpp/include/aidin/registers.hpp`](cpp/include/aidin/registers.hpp) /
   [`python/aidin_gripper/registers.py`](python/aidin_gripper/registers.py)
-  is guaranteed accurate for this repo's version.
+  are exercised by this repo's SDKs; the extended blocks below (config,
+  force control, sensors) are summarized from the manual.
 
-### Register map (everything the SDKs in this repo touch)
+### Register map / 레지스터 맵
+
+> **📖 상세 설명은 매뉴얼을 참고하세요.** 아래 모든 레지스터의 비트맵, 값
+> 스케일링(정규화 공식), 사용 시퀀스, Modbus 프레임 예제는 **AIDIN Gripper
+> Modbus RTU Protocol Manual** (`aidin_modbus_rtu_manual.pdf` / `.html`)에
+> 있습니다. 이 README는 요약본입니다.
+> **For full details see the manual** — this README only summarizes each
+> register in one line.
+
+#### Motion control / 동작 제어 (Write, `0x0100~`)
 
 | Addr | R/W | Field | Meaning |
 |---|---|---|---|
-| `0x0100` | W | `ACTION` | bitfield — see below |
-| `0x0101` | W | `SPEED` (`rSP`) | 0..255 |
-| `0x0102` | W | `FORCE` (`rFR`) | 0..255 (current/force limit) |
+| `0x0100` | W | `ACTION` | activation / homing / go-to / emergency-release bitfield — see below |
+| `0x0101` | W | `SPEED` (`rSP`) | 0..255 (255 = 100% of `MAX_VELOCITY`; 0 still keeps an internal minimum) |
+| `0x0102` | W | `FORCE` (`rFR`) | 0..255 current/force limit (0 = 25% hardware floor, 255 = 100%) |
 | `0x0103` | W | `POSITION` (`rPR`) | 0..255 — **0 = fully open, 255 = fully closed** |
+
+#### Status & telemetry / 상태·텔레메트리 (Read, `0x0200~`)
+
+| Addr | R/W | Field | Meaning |
+|---|---|---|---|
 | `0x0200` | R | `STATUS` | bitfield — see below |
-| `0x0201` | R | `FAULT` (`gFLT`) | 0 = OK, nonzero = active fault code |
+| `0x0201` | R | `FAULT` (`gFLT`) | current fault code, 0 = OK — see fault code table below |
 | `0x0202` | R | `POS_ECHO` (`gPR`) | echo of the last `rPR` written |
-| `0x0203` | R | `POS_ACTUAL` (`gPO`) | actual position 0..255 |
-| `0x0204` | R | `CUR_ACTUAL` (`gCU`) | actual current 0..255 (raw) |
-| `0x0205` | R | `SPD_ACTUAL` (`gSP`) | actual speed 0..255 (raw) |
+| `0x0203` | R | `POS_ACTUAL` (`gPO`) | actual position 0..255 (reads 0 until homed) |
+| `0x0204` | R | `CUR_ACTUAL` (`gCU`) | actual motor current 0..255 (normalized to `NOMINAL_CURRENT`) |
+| `0x0205` | R | `SPD_ACTUAL` (`gSP`) | actual speed 0..255 (normalized to `MAX_VELOCITY`) |
 | `0x0206` | R | `VOLTAGE` (`gV`) | supply voltage — register × 0.1 = volts |
-| `0x0207` | R | `FAULT_LATCH` (`gFLTO`) | sticky fault code (persists after `gFLT` clears) |
-| `0x0182` | R/W | `CFG_MB_ADDR` | Modbus slave address, 1..247 (factory config — see "Multiple grippers on one bus" in [python/README.md](python/README.md#multiple-grippers-on-one-bus-rs485-multi-drop)) |
-| `0x0180` / `0x0181` | R/W | `DEV_CMD` / `DEV_STATUS` | factory/developer command channel — **not** for normal operation; consult firmware docs before using |
+| `0x0207` | R | `FAULT_LATCH` (`gFLTO`) | latched fault history — persists until cleared with `DEV_CMD 0x07 FAULT_CLEAR` |
 
 `STATUS`..`FAULT_LATCH` (`0x0200`..`0x0207`, 8 registers) are meant to be
 read **in one block transaction**, not one register at a time — that's
 what every SDK's `read_state()` / `readState()` does.
+
 
 ### `ACTION` bits (write, `0x0100`)
 
@@ -179,6 +196,96 @@ re-asserting) the others. This is also why `emergency_release()` writing
 | 4-5 | `gSTA` | `00`=Reset, `01`=Activating, `11`=Active |
 | 6-7 | `gOBJ` | `00`=Moving, `01`=stopped on object while opening, `10`=stopped on object while closing, `11`=at target |
 
+### Fault codes / 폴트 코드 (`gFLT` / `gFLTO`)
+
+`gFLT` (0x0201) is the live fault, `gFLTO` (0x0207) is the latched
+history — check it for faults that came and went, then clear with
+`DEV_CMD 0x07 FAULT_CLEAR`. 원인·조치 상세는 매뉴얼 참고.
+
+| Code | Name | Meaning / action |
+|---|---|---|
+| 0 | `OK` | normal operation |
+| 1 | `NOT_INITIALIZED` | not activated — send `rACT = 1` |
+| 2 | `INVALID_COMMAND` | unsupported command received |
+| 3 | `INVALID_PARAMETER` | parameter out of range |
+| 4 | `OVER_CURRENT` | over-current — check the load, power-cycle |
+| 5 | `OVER_TEMPERATURE` | over-temperature — cool down, restart |
+| 6 | `UNDER_VOLTAGE` | supply voltage too low — check the power supply |
+| 7 | `MOTOR_STALL` | motor stall — check for a mechanical jam |
+| 8 | `SENSOR_ERROR` | encoder signal error — check wiring |
+| 9 | `COMM_TIMEOUT` | communication timeout — check cable / baud rate |
+| 10 | `INTERNAL_ERROR` | internal error — power-cycle, contact A/S if persistent |
+| 11 | `GATE_DRIVER_FAULT` | gate-driver hardware fault (OCP/OTSD/UVLO) — check supply/wiring, then `FAULT_CLEAR` |
+
+#### Device config & developer channel / 장치 설정 (`0x0180~`)
+
+Config writes land in RAM only — persist them with `DEV_CMD 0x02
+SAVE_CONFIG`; address/baud changes apply after a power cycle. 상세 절차는
+매뉴얼 참고.
+
+| Addr | R/W | Field | Meaning |
+|---|---|---|---|
+| `0x0180` | W | `DEV_CMD` | developer/config command code — key codes below |
+| `0x0181` | R | `DEV_STATUS` | 0 = IDLE · 1 = RUNNING · 2 = OK · 3 = ERROR |
+| `0x0182` | R/W | `CFG_MB_ADDR` | Modbus slave address, 1..247 (see "Multiple grippers on one bus" in [python/README.md](python/README.md#multiple-grippers-on-one-bus-rs485-multi-drop)) |
+| `0x0183`/`0x0184` | R | `CFG_MB_BAUD_LO/HI` | serial baud rate as 32-bit LO/HI (e.g. 115200 → `0xC200`/`0x0001`) |
+| `0x0185`/`0x0186` | R/W | `CFG_CAN_ID` / `CFG_CAN_RATE` | FDCAN node ID / rate (1 = 1 Mbps, 2 = 500 kbps) |
+| `0x0187` | R | `CFG_DEV_TYPE` | device type (101 = AIDIN_GRIPPER) |
+| `0x0188`/`0x0189` | R | `CFG_SERIAL_LO/HI` | serial number, 32-bit LO/HI |
+| `0x018A` | R/W | `CFG_SENSOR_TYPE` | fingertip sensor: 0 = none, 1 = AFT F/T, 2 = tactile — applied at boot |
+| `0x018B` | R | `CFG_STROKE_MRAD` | calibrated stroke [rad × 1000] — set only by `DEV_CMD 0x0A STROKE_CAL` |
+| `0x0190~0x0196` | R/W | `PID_*` | position/speed/current loop gains — tuning only, see manual |
+| `0x0197~0x019A` | R/W | `FF_*` | position feedforward gains — applied via `DEV_CMD 0x0B/0x0C` |
+
+#### (지속 업데이트) Force control / 힘 제어 (`0x01A0~0x01A9`)
+
+Constant-force grasp, impedance/admittance compliance, hand-guiding. Gains
+are int16 fixed-point (register = physical gain × 10). Write parameters
+first, switch `FC_MODE` last, then **read `FC_MODE` back** — the firmware
+resets it to 0 when entry is rejected (e.g. impedance/admittance before
+homing). 모드별 파라미터, 단위계, 안전 폴백 등 상세는 매뉴얼 참고.
+
+| Addr | R/W | Field | Meaning |
+|---|---|---|---|
+| `0x01A0` | R/W | `FC_MODE` | 0 = off · 1 = simple · 2 = impedance · 3 = admittance — readback = actual mode |
+| `0x01A1` | W | `FC_FORCE` | target force (simple) / external force F_ext (admittance) [mA] |
+| `0x01A2~0x01A4` | W | `FC_STIFFNESS` / `FC_DAMPING` / `FC_MASS` | Kx / Kb / Mv gains (× 10) |
+| `0x01A5` | W | `FC_EQUIL` | equilibrium position 0..255 (0 = open) — live-updatable while active |
+| `0x01A6` | W | `FC_SPEED_LIMIT` | speed safety limit [rad/s × 100], 0 = firmware default |
+| `0x01A7` | W | `FC_FB_SRC` | feedback source: 0 = sensorless · 1/2 = AFT tip1/tip2 Fz · 3 = tip1+tip2 · 4 = Iq self-sensing |
+| `0x01A8` | R | `FC_FORCE_ACT` | measured force feedback — [N × 100] with F/T sensor source, else [mA] |
+| `0x01A9` | R | `FC_POS_ACT` | position feedback 0..255 |
+
+#### (개발중, 지속 업데이트 예정) External sensors / 외부 센서 (Read, `0x0210~`)
+
+Fingertip sensor values relayed from CAN; select the sensor with
+`CFG_SENSOR_TYPE` (0x018A) + `SAVE_CONFIG` + power cycle. Tare with
+`DEV_CMD 0x08 SENSOR_ZERO`. 상태 비트필드와 스케일링 상세는 매뉴얼 참고.
+
+| Addr | R/W | Field | Meaning |
+|---|---|---|---|
+| `0x0210~0x0216` | R | `SENSOR_STATUS`, `FT_FX..FT_TZ` | tip 1 six-axis F/T — force [N × 100], torque [Nm × 1000] |
+| `0x0217~0x021D` | R | `SENSOR2_STATUS`, `FT2_FX..FT2_TZ` | tip 2, same layout — poll both tips as one 14-register block read |
+| `0x0220~0x0241` | R | `TACT1_*` | tip 1 tactile (AIDIN-FS) cell map — status + cell count + 32 cells [N × 100] |
+| `0x0242~0x0263` | R | `TACT2_*` | tip 2, same layout — poll both tips as one 68-register block read from `0x0220` |
+| `0x01B0~0x01B9` | W | `TACT_CMD_*` | tactile sensor CAN command buffer — transmitted with `DEV_CMD 0x09` |
+
+### Key `DEV_CMD` codes (`0x0180`)
+
+Write the code to `DEV_CMD` (0x0180), then poll `DEV_STATUS` (0x0181)
+until it leaves RUNNING (→ OK or ERROR). 전체 코드 목록(전기각 보정,
+PID 저장/복원 등)과 절차는 매뉴얼 참고.
+
+| Code | Name | What it does |
+|---|---|---|
+| `0x02` | `SAVE_CONFIG` | persist the config registers (`0x0182~`) to flash |
+| `0x07` | `FAULT_CLEAR` | acknowledge the motor fault + clear latched `gFLTO` |
+| `0x08` | `SENSOR_ZERO` | tare the fingertip sensors (per-session, RAM only) |
+| `0x0A` | `STROKE_CAL` | re-measure the usable stroke after a fingertip change (~20 s, saved to flash) |
+
+> Flash-writing commands (`SAVE_CONFIG`, `SAVE_PID`, `FF_SAVE`) stall
+> Modbus for ~10 ms — use a response timeout ≥ 50 ms.
+
 ### Protocol invariants an integration needs to get right
 
 - **Position is inverted from what you might guess**: `0` = open, `255` = closed.
@@ -189,6 +296,10 @@ re-asserting) the others. This is also why `emergency_release()` writing
   needs an `rGTO` 0→1 pulse, not just rewriting `rGTO=1`.
 - `emergency_release()`/`emergencyRelease()` drops `rACT` — call
   `activate()` again afterward, or every subsequent command is ignored.
+- If you use **force control** (`FC_*`): write the parameters first and
+  switch `FC_MODE` last, then **read `FC_MODE` back** — the firmware
+  silently resets it to 0 when entry is rejected (impedance/admittance
+  require homing first) and when `rATR` force-terminates force control.
 - Treat a full status read (8 registers, `0x0200`-`0x0207`) as one
   transaction; don't split it into 8 separate reads, both for latency and
   because the fields are meant to be read as one consistent snapshot.
